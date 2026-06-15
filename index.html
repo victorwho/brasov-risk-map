@@ -495,15 +495,21 @@ function styleFeature(feature) {
 function buildPopup(props) {
     let factorsHtml = '';
     if (props.risk_factors) {
-        const entries = Object.entries(props.risk_factors).sort((a, b) => b[1] - a[1]);
+        // Public map: factor values are direction labels ('increase'/'decrease'),
+        // not numeric weights. Show which factors raise/lower risk, not by how much.
+        const isUp = v => v === 'increase' || (typeof v === 'number' && v > 0);
+        const entries = Object.entries(props.risk_factors)
+            .sort((a, b) => (isUp(b[1]) - isUp(a[1])) || a[0].localeCompare(b[0]));
         if (entries.length) {
             factorsHtml += '<table class="popup-factors-table">';
             for (const [k, v] of entries) {
-                const color = v > 0 ? '#c62828' : '#2e7d32';
-                const sign = v > 0 ? '+' : '';
+                const up = isUp(v);
+                const color = up ? '#c62828' : '#2e7d32';
+                const arrow = up ? '▲' : '▼';
+                const word = up ? 'increases risk' : 'decreases risk';
                 factorsHtml += `<tr>
                     <td>${k}</td>
-                    <td style="text-align:right;color:${color};font-weight:700;">${sign}${v.toFixed(1)}</td>
+                    <td style="text-align:right;color:${color};font-weight:700;white-space:nowrap;">${arrow} ${word}</td>
                 </tr>`;
             }
             factorsHtml += '</table>';
