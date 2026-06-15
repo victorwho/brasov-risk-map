@@ -435,7 +435,7 @@ function getRiskColor(r) {
     if (r < 65)  return '#FF9800';
     if (r < 80)  return '#FF5722';
     if (r < 100) return '#F44336';
-    return '#9C27B0';
+    return '#000000';
 }
 
 function getRiskLabel(r) {
@@ -624,7 +624,7 @@ function calculateStats() {
             bar('#FFC107', 'Moderate', dist.moderate) +
             bar('#FF9800', 'Elevated', dist.elevated) +
             bar('#FF5722', 'High (≥65)', dist.high) +
-            bar('#9C27B0', 'Extreme', dist.extreme);
+            bar('#000000', 'Extreme', dist.extreme);
     }
 }
 
@@ -730,7 +730,7 @@ legend.onAdd = function () {
         { color: '#FF9800', label: 'Elevated  (58–65)' },
         { color: '#FF5722', label: 'High  (65–80)' },
         { color: '#F44336', label: 'Very High  (80–100)' },
-        { color: '#9C27B0', label: 'Extreme  (>100)' },
+        { color: '#000000', label: 'Extreme  (>100)' },
     ];
     div.innerHTML = '<h4>Risk Score</h4>' +
         bands.map(b =>
