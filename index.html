@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brașov Metropolitan Area — Cycling Risk Map</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #1a1a2e;
+        }
+
+        #map { width: 100%; height: 100vh; }
+
+        /* ── Sidebar ── */
+        #sidebar {
+            position: absolute;
+            top: 0; left: 0;
+            width: 300px;
+            height: 100vh;
+            background: rgba(255,255,255,0.97);
+            box-shadow: 2px 0 20px rgba(0,0,0,0.25);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        #sidebar.collapsed { transform: translateX(-300px); }
+
+        #sidebar-header {
+            background: linear-gradient(135deg, #1a237e, #283593);
+            color: white;
+            padding: 18px 16px 14px;
+            flex-shrink: 0;
+        }
+
+        #sidebar-header h2 {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+        }
+
+        #sidebar-header .subtitle {
+            font-size: 11px;
+            opacity: 0.75;
+            margin-top: 3px;
+        }
+
+        #sidebar-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 14px;
+        }
+
+        .section {
+            margin-bottom: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 12px;
+        }
+
+        .section:last-child { border-bottom: none; }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        /* ── Stats ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .stat-card {
+            background: #f7f8fc;
+            border-radius: 6px;
+            padding: 8px 10px;
+            border: 1px solid #e8eaf0;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.2;
+            margin-top: 2px;
+        }
+
+        .stat-value.small { font-size: 14px; }
+
+        /* ── Risk gauge ── */
+        #risk-gauge-wrap {
+            text-align: center;
+            padding: 6px 0 4px;
+        }
+
+        #risk-gauge-label {
+            font-size: 40px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        #risk-category {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* ── Controls ── */
+        .control-row {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            gap: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .control-row input[type="radio"],
+        .control-row input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #1a237e;
+            width: 14px;
+            height: 14px;
+        }
+
+        .control-row label { cursor: pointer; flex: 1; }
+
+        /* ── Search ── */
+        #road-search {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #road-search:focus { border-color: #1a237e; }
+
+        #search-results {
+            margin-top: 6px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .search-result-item {
+            padding: 5px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .search-result-item:hover { background: #f0f4ff; }
+
+        .search-result-name { font-weight: 600; color: #333; }
+
+        .search-result-risk {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        /* ── Toggle button ── */
+        #toggle-sidebar {
+            position: absolute;
+            top: 50%;
+            left: 300px;
+            transform: translateY(-50%);
+            z-index: 1001;
+            background: white;
+            border: none;
+            border-radius: 0 6px 6px 0;
+            width: 20px;
+            height: 50px;
+            cursor: pointer;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            font-size: 12px;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: left 0.3s ease;
+        }
+
+        #toggle-sidebar.collapsed { left: 0; }
+
+        /* ── Legend ── */
+        .legend {
+            background: white;
+            padding: 12px 14px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .legend h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+
+        .legend-bar {
+            width: 28px;
+            height: 5px;
+            margin-right: 8px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        /* ── Loading ── */
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(26,35,126,0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            color: white;
+        }
+
+        #loading-overlay .spinner {
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            animation: spin 0.7s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        #loading-overlay .load-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        #loading-overlay .load-sub {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Popup ── */
+        .popup-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a237e;
+            margin-bottom: 6px;
+        }
+
+        .popup-risk-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .popup-risk-score {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .popup-risk-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .popup-factors-table {
+            width: 100%;
+            font-size: 12px;
+            border-collapse: collapse;
+        }
+
+        .popup-factors-table td {
+            padding: 2px 4px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .popup-meta {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 6px;
+        }
+
+        /* ── Scrollbar ── */
+        #sidebar-body::-webkit-scrollbar { width: 4px; }
+        #sidebar-body::-webkit-scrollbar-track { background: #f5f5f5; }
+        #sidebar-body::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
+        @media (max-width: 600px) {
+            #sidebar { width: 260px; }
+            #toggle-sidebar { left: 260px; }
+            #toggle-sidebar.collapsed { left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="load-title">Brașov Risk Map</div>
+    <div class="load-sub">Loading road risk data…</div>
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+    <div id="sidebar-header">
+        <h2>Brașov Metropolitan Area</h2>
+        <div class="subtitle">Cycling Risk Map · Defensive Pedal</div>
+    </div>
+    <div id="sidebar-body">
+
+        <!-- Avg Risk gauge -->
+        <div class="section">
+            <div class="section-title">Avg Risk — Visible Area</div>
+            <div id="risk-gauge-wrap">
+                <div id="risk-gauge-label" style="color:#999;">—</div>
+                <div id="risk-category" style="color:#aaa;">loading…</div>
+            </div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="section">
+            <div class="section-title">Statistics</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Segments</div>
+                    <div class="stat-value small" id="stat-segments">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Network km</div>
+                    <div class="stat-value small" id="stat-km">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">High Risk ≥65</div>
+                    <div class="stat-value small" id="stat-high">—</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Safe &lt;42</div>
+                    <div class="stat-value small" id="stat-safe">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Road search -->
+        <div class="section">
+            <div class="section-title">Search Road</div>
+            <input type="text" id="road-search" placeholder="Type a road name…" oninput="searchRoads(this.value)">
+            <div id="search-results"></div>
+        </div>
+
+        <!-- Risk distribution -->
+        <div class="section">
+            <div class="section-title">Risk Distribution</div>
+            <div id="risk-dist" style="font-size:12px; color:#666; line-height:1.8;">—</div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Sidebar toggle -->
+<button id="toggle-sidebar" onclick="toggleSidebar()" title="Toggle sidebar">◀</button>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Map init ──────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: false }).setView([45.6427, 25.5935], 13);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Base layers
+const cartoLight = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 20 }
+);
+const cartoDark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 20 }
+);
+cartoLight.addTo(map);
+
+// ── Risk color scale ──────────────────────────────────────────────────────────
+function getRiskColor(r) {
+    if (r < 30)  return '#4CAF50';
+    if (r < 42)  return '#8BC34A';
+    if (r < 50)  return '#CDDC39';
+    if (r < 58)  return '#FFC107';
+    if (r < 65)  return '#FF9800';
+    if (r < 80)  return '#FF5722';
+    if (r < 100) return '#F44336';
+    return '#9C27B0';
+}
+
+function getRiskLabel(r) {
+    if (r < 30)  return 'Very Safe';
+    if (r < 42)  return 'Safe';
+    if (r < 50)  return 'Low Risk';
+    if (r < 58)  return 'Moderate';
+    if (r < 65)  return 'Elevated';
+    if (r < 80)  return 'High';
+    if (r < 100) return 'Very High';
+    return 'Extreme';
+}
+
+function getRiskWeight(r, zoom) {
+    const base = zoom >= 16 ? 4 : zoom >= 14 ? 3 : 2;
+    if (r >= 80) return base + 2;
+    if (r >= 65) return base + 1;
+    return base;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let dataLayer = null;
+let allFeatures = [];
+let viewMode = 'all';
+let urbanOnly = false;
+let sidebarOpen = true;
+
+// ── Style / filter ────────────────────────────────────────────────────────────
+const CYCLING_TYPES = new Set([
+    'cycleway', 'path', 'footway', 'pedestrian', 'living_street', 'service'
+]);
+const MAIN_TYPES = new Set([
+    'primary', 'primary_link', 'trunk', 'trunk_link', 'secondary', 'secondary_link'
+]);
+
+function isVisible(props) {
+    if (urbanOnly && !props.is_urban) return false;
+    if (viewMode === 'main') return MAIN_TYPES.has(props.highway || '');
+    if (viewMode === 'cycling') return CYCLING_TYPES.has(props.highway || '');
+    return true;
+}
+
+function styleFeature(feature) {
+    const p = feature.properties;
+    const zoom = map.getZoom();
+    if (!isVisible(p)) {
+        return { color: 'transparent', weight: 0, opacity: 0 };
+    }
+    return {
+        color: getRiskColor(p.risk),
+        weight: getRiskWeight(p.risk, zoom),
+        opacity: 0.85
+    };
+}
+
+// ── Popup ─────────────────────────────────────────────────────────────────────
+function buildPopup(props) {
+    let factorsHtml = '';
+    if (props.risk_factors) {
+        const entries = Object.entries(props.risk_factors).sort((a, b) => b[1] - a[1]);
+        if (entries.length) {
+            factorsHtml += '<table class="popup-factors-table">';
+            for (const [k, v] of entries) {
+                const color = v > 0 ? '#c62828' : '#2e7d32';
+                const sign = v > 0 ? '+' : '';
+                factorsHtml += `<tr>
+                    <td>${k}</td>
+                    <td style="text-align:right;color:${color};font-weight:700;">${sign}${v.toFixed(1)}</td>
+                </tr>`;
+            }
+            factorsHtml += '</table>';
+        }
+    }
+
+    const riskColor = getRiskColor(props.risk);
+    return `
+        <div style="min-width:220px;max-width:300px;">
+            <div class="popup-title">${props.name || '<em style="color:#999">Unnamed Road</em>'}</div>
+            <div class="popup-risk-row">
+                <span class="popup-risk-score" style="color:${riskColor}">${props.risk.toFixed(1)}</span>
+                <span class="popup-risk-label">${getRiskLabel(props.risk)}</span>
+            </div>
+            <div style="background:#f8f9fa;border-radius:5px;padding:8px;max-height:200px;overflow-y:auto;">
+                <div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Risk Breakdown</div>
+                ${factorsHtml || '<div style="font-style:italic;color:#bbb;font-size:12px;">No detail available</div>'}
+            </div>
+            <div class="popup-meta">
+                <strong>Type:</strong> ${props.highway || '?'} &nbsp;·&nbsp;
+                <strong>Way:</strong> ${props.way_id} &nbsp;·&nbsp;
+                <strong>Raw:</strong> ${props.raw_risk.toFixed(1)}
+            </div>
+        </div>`;
+}
+
+function onEachFeature(feature, layer) {
+    layer.bindPopup(() => buildPopup(feature.properties), { maxWidth: 340 });
+
+    layer.on('mouseover', function () {
+        if (isVisible(feature.properties)) {
+            this.setStyle({ weight: getRiskWeight(feature.properties.risk, map.getZoom()) + 3, opacity: 1 });
+            this.bringToFront();
+        }
+    });
+    layer.on('mouseout', function () {
+        this.setStyle(styleFeature(feature));
+    });
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function calculateStats() {
+    if (!dataLayer) return;
+
+    const bounds = map.getBounds();
+    let totalLen = 0, weightedRisk = 0, count = 0;
+    let highCount = 0, safeCount = 0;
+    const dist = { safe: 0, low: 0, moderate: 0, elevated: 0, high: 0, extreme: 0 };
+
+    dataLayer.eachLayer(layer => {
+        const p = layer.feature.properties;
+        if (!isVisible(p)) return;
+
+        const coords = layer.feature.geometry.coordinates;
+        let inView = false;
+        for (const [x, y] of coords) {
+            if (bounds.contains(L.latLng(y, x))) { inView = true; break; }
+        }
+        if (!inView) return;
+
+        let len = 0;
+        for (let i = 0; i < coords.length - 1; i++) {
+            len += L.latLng(coords[i][1], coords[i][0]).distanceTo(L.latLng(coords[i+1][1], coords[i+1][0]));
+        }
+
+        totalLen += len;
+        weightedRisk += p.risk * len;
+        count++;
+        if (p.risk >= 65) highCount++;
+        if (p.risk < 42)  safeCount++;
+
+        if (p.risk < 42) dist.safe++;
+        else if (p.risk < 50) dist.low++;
+        else if (p.risk < 58) dist.moderate++;
+        else if (p.risk < 65) dist.elevated++;
+        else if (p.risk < 100) dist.high++;
+        else dist.extreme++;
+    });
+
+    const avg = totalLen > 0 ? weightedRisk / totalLen : 0;
+    const km = (totalLen / 1000).toFixed(1);
+
+    // Update gauge
+    const gauge = document.getElementById('risk-gauge-label');
+    const cat = document.getElementById('risk-category');
+    if (avg > 0) {
+        gauge.textContent = avg.toFixed(1);
+        gauge.style.color = getRiskColor(avg);
+        cat.textContent = getRiskLabel(avg);
+    } else {
+        gauge.textContent = '—';
+        cat.textContent = 'no visible roads';
+    }
+
+    document.getElementById('stat-segments').textContent = count.toLocaleString();
+    document.getElementById('stat-km').textContent = km;
+    document.getElementById('stat-high').textContent = highCount.toLocaleString();
+    document.getElementById('stat-safe').textContent = safeCount.toLocaleString();
+
+    // Distribution bars
+    if (count > 0) {
+        const pct = n => ((n / count) * 100).toFixed(0);
+        const bar = (color, label, n) =>
+            `<div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+                <div style="width:${Math.max(2, pct(n))}%;max-width:100%;height:8px;background:${color};border-radius:3px;transition:width .3s;"></div>
+                <span style="min-width:80px;">${label}</span>
+                <span style="color:#555;font-weight:600;">${n}</span>
+            </div>`;
+        document.getElementById('risk-dist').innerHTML =
+            bar('#4CAF50', 'Safe (<42)', dist.safe) +
+            bar('#CDDC39', 'Low (42-50)', dist.low) +
+            bar('#FFC107', 'Moderate', dist.moderate) +
+            bar('#FF9800', 'Elevated', dist.elevated) +
+            bar('#FF5722', 'High (≥65)', dist.high) +
+            bar('#9C27B0', 'Extreme', dist.extreme);
+    }
+}
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+function updateViewMode() {
+    const radios = document.getElementsByName('view-mode');
+    for (const r of radios) { if (r.checked) { viewMode = r.value; break; } }
+    redrawMap();
+}
+
+function toggleUrban() {
+    urbanOnly = document.getElementById('urban-toggle').checked;
+    redrawMap();
+}
+
+function redrawMap() {
+    if (dataLayer) {
+        const zoom = map.getZoom();
+        dataLayer.eachLayer(layer => layer.setStyle(styleFeature(layer.feature)));
+    }
+    calculateStats();
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let searchDebounce = null;
+
+function searchRoads(query) {
+    clearTimeout(searchDebounce);
+    const results = document.getElementById('search-results');
+    if (!query.trim()) { results.innerHTML = ''; return; }
+
+    searchDebounce = setTimeout(() => {
+        const q = query.toLowerCase();
+        const matches = [];
+        const seen = new Set();
+
+        for (const f of allFeatures) {
+            const name = f.properties.name;
+            if (!name) continue;
+            if (!name.toLowerCase().includes(q)) continue;
+            if (seen.has(name)) continue;
+            seen.add(name);
+            matches.push(f);
+            if (matches.length >= 12) break;
+        }
+
+        if (!matches.length) {
+            results.innerHTML = '<div style="font-size:12px;color:#aaa;padding:4px;">No roads found</div>';
+            return;
+        }
+
+        results.innerHTML = matches.map(f => {
+            const risk = f.properties.risk;
+            const color = getRiskColor(risk);
+            return `<div class="search-result-item" onclick="flyToRoad('${f.properties.name.replace(/'/g, "\\'")}')">
+                <span class="search-result-name">${f.properties.name}</span>
+                <span class="search-result-risk" style="background:${color}">${risk.toFixed(0)}</span>
+            </div>`;
+        }).join('');
+    }, 200);
+}
+
+function flyToRoad(name) {
+    const pts = [];
+    dataLayer.eachLayer(layer => {
+        if (layer.feature.properties.name === name) {
+            const coords = layer.feature.geometry.coordinates;
+            for (const [x, y] of coords) pts.push(L.latLng(y, x));
+        }
+    });
+    if (!pts.length) return;
+    const bounds = L.latLngBounds(pts);
+    map.fitBounds(bounds.pad(0.3));
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('road-search').value = name;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+    const sb = document.getElementById('sidebar');
+    const btn = document.getElementById('toggle-sidebar');
+    if (sidebarOpen) {
+        sb.classList.remove('collapsed');
+        btn.classList.remove('collapsed');
+        btn.textContent = '◀';
+    } else {
+        sb.classList.add('collapsed');
+        btn.classList.add('collapsed');
+        btn.textContent = '▶';
+    }
+}
+
+// ── Legend ────────────────────────────────────────────────────────────────────
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'legend');
+    const bands = [
+        { color: '#4CAF50', label: 'Very Safe  (<30)' },
+        { color: '#8BC34A', label: 'Safe  (30–42)' },
+        { color: '#CDDC39', label: 'Low Risk  (42–50)' },
+        { color: '#FFC107', label: 'Moderate  (50–58)' },
+        { color: '#FF9800', label: 'Elevated  (58–65)' },
+        { color: '#FF5722', label: 'High  (65–80)' },
+        { color: '#F44336', label: 'Very High  (80–100)' },
+        { color: '#9C27B0', label: 'Extreme  (>100)' },
+    ];
+    div.innerHTML = '<h4>Risk Score</h4>' +
+        bands.map(b =>
+            `<div class="legend-item">
+                <div class="legend-bar" style="background:${b.color}"></div>
+                <span>${b.label}</span>
+            </div>`
+        ).join('');
+    return div;
+};
+legend.addTo(map);
+
+// ── Load data ─────────────────────────────────────────────────────────────────
+fetch('brasov_risk.geojson')
+    .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+    })
+    .then(data => {
+        allFeatures = data.features;
+
+        dataLayer = L.geoJSON(data, {
+            style: styleFeature,
+            onEachFeature: onEachFeature
+        }).addTo(map);
+
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        calculateStats();
+        map.on('moveend zoomend', () => { redrawMap(); });
+
+        console.log(`Loaded ${data.features.length} features`);
+    })
+    .catch(err => {
+        const ol = document.getElementById('loading-overlay');
+        ol.innerHTML = `
+            <div style="text-align:center;max-width:400px;padding:20px;">
+                <div style="font-size:48px;margin-bottom:12px;">⚠</div>
+                <div style="font-size:20px;font-weight:700;margin-bottom:8px;">Could not load risk data</div>
+                <div style="opacity:.75;margin-bottom:16px;">${err.message}</div>
+                <div style="font-size:13px;opacity:.6;background:rgba(255,255,255,.1);padding:10px;border-radius:6px;">
+                    Generate the GeoJSON first:<br>
+                    <code>python filter_brasov_risk.py</code>
+                </div>
+            </div>`;
+    });
+</script>
+</body>
+</html>
