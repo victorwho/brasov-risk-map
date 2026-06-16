@@ -387,6 +387,15 @@
             </div>
         </div>
 
+        <!-- View filter -->
+        <div class="section">
+            <div class="section-title">View</div>
+            <div class="control-row">
+                <input type="checkbox" id="pedestrian-toggle" onchange="togglePedestrian()">
+                <label for="pedestrian-toggle">Pedestrian zones &amp; footways only</label>
+            </div>
+        </div>
+
         <!-- Road search -->
         <div class="section">
             <div class="section-title">Search Road</div>
@@ -461,6 +470,7 @@ let dataLayer = null;
 let allFeatures = [];
 let viewMode = 'all';
 let urbanOnly = false;
+let pedestrianOnly = false;
 let sidebarOpen = true;
 
 // ── Style / filter ────────────────────────────────────────────────────────────
@@ -470,9 +480,12 @@ const CYCLING_TYPES = new Set([
 const MAIN_TYPES = new Set([
     'primary', 'primary_link', 'trunk', 'trunk_link', 'secondary', 'secondary_link'
 ]);
+// Pedestrian zones and footways
+const PEDESTRIAN_TYPES = new Set(['pedestrian', 'footway']);
 
 function isVisible(props) {
     if (urbanOnly && !props.is_urban) return false;
+    if (pedestrianOnly && !PEDESTRIAN_TYPES.has(props.highway || '')) return false;
     if (viewMode === 'main') return MAIN_TYPES.has(props.highway || '');
     if (viewMode === 'cycling') return CYCLING_TYPES.has(props.highway || '');
     return true;
@@ -637,6 +650,11 @@ function updateViewMode() {
 
 function toggleUrban() {
     urbanOnly = document.getElementById('urban-toggle').checked;
+    redrawMap();
+}
+
+function togglePedestrian() {
+    pedestrianOnly = document.getElementById('pedestrian-toggle').checked;
     redrawMap();
 }
 
