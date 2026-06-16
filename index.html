@@ -391,8 +391,16 @@
         <div class="section">
             <div class="section-title">View</div>
             <div class="control-row">
-                <input type="checkbox" id="pedestrian-toggle" onchange="togglePedestrian()">
-                <label for="pedestrian-toggle">Pedestrian zones &amp; footways only</label>
+                <input type="radio" id="seg-all" name="seg-view" value="all" checked onchange="setSegView('all')">
+                <label for="seg-all">All segments</label>
+            </div>
+            <div class="control-row">
+                <input type="radio" id="seg-ped" name="seg-view" value="pedestrian" onchange="setSegView('pedestrian')">
+                <label for="seg-ped">Pedestrian zones &amp; footways</label>
+            </div>
+            <div class="control-row">
+                <input type="radio" id="seg-cycle" name="seg-view" value="cycleway" onchange="setSegView('cycleway')">
+                <label for="seg-cycle">Cycleways (all types)</label>
             </div>
         </div>
 
@@ -470,7 +478,7 @@ let dataLayer = null;
 let allFeatures = [];
 let viewMode = 'all';
 let urbanOnly = false;
-let pedestrianOnly = false;
+let segView = 'all';   // 'all' | 'pedestrian' | 'cycleway'
 let sidebarOpen = true;
 
 // ── Style / filter ────────────────────────────────────────────────────────────
@@ -482,10 +490,25 @@ const MAIN_TYPES = new Set([
 ]);
 // Pedestrian zones and footways
 const PEDESTRIAN_TYPES = new Set(['pedestrian', 'footway']);
+// Cycling infrastructure: separate cycleways (highway=cycleway) plus on-road /
+// shared facilities flagged via risk factors (bike lanes, tracks, sharrows…).
+const CYCLE_FACTOR_KEYS = [
+    'Cycle Track', 'Bicycle Road', 'Buffered Lane', 'Bike Lane',
+    'Sharrow', 'Segregated Path', 'Bicycle Designated'
+];
+function isCyclewayFeature(p) {
+    if ((p.highway || '') === 'cycleway') return true;
+    const rf = p.risk_factors;
+    if (rf) {
+        for (const k of CYCLE_FACTOR_KEYS) if (k in rf) return true;
+    }
+    return false;
+}
 
 function isVisible(props) {
     if (urbanOnly && !props.is_urban) return false;
-    if (pedestrianOnly && !PEDESTRIAN_TYPES.has(props.highway || '')) return false;
+    if (segView === 'pedestrian' && !PEDESTRIAN_TYPES.has(props.highway || '')) return false;
+    if (segView === 'cycleway' && !isCyclewayFeature(props)) return false;
     if (viewMode === 'main') return MAIN_TYPES.has(props.highway || '');
     if (viewMode === 'cycling') return CYCLING_TYPES.has(props.highway || '');
     return true;
@@ -653,8 +676,8 @@ function toggleUrban() {
     redrawMap();
 }
 
-function togglePedestrian() {
-    pedestrianOnly = document.getElementById('pedestrian-toggle').checked;
+function setSegView(mode) {
+    segView = mode;
     redrawMap();
 }
 
