@@ -398,14 +398,6 @@
                 <input type="radio" id="seg-urban" name="seg-view" value="urban" onchange="setSegView('urban')">
                 <label for="seg-urban">Urban streets only (no trails/rural)</label>
             </div>
-            <div class="control-row">
-                <input type="radio" id="seg-ped" name="seg-view" value="pedestrian" onchange="setSegView('pedestrian')">
-                <label for="seg-ped">Pedestrian zones &amp; footways</label>
-            </div>
-            <div class="control-row">
-                <input type="radio" id="seg-cycle" name="seg-view" value="cycleway" onchange="setSegView('cycleway')">
-                <label for="seg-cycle">Cycleways (all types)</label>
-            </div>
             <div class="control-row" style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
                 <input type="checkbox" id="brasov-toggle" onchange="toggleBrasov()">
                 <label for="brasov-toggle">Brașov city only (exclude metro)</label>
@@ -486,7 +478,7 @@ let dataLayer = null;
 let allFeatures = [];
 let viewMode = 'all';
 let urbanOnly = false;
-let segView = 'all';   // 'all' | 'urban' | 'pedestrian' | 'cycleway'
+let segView = 'all';   // 'all' | 'urban'
 let brasovOnly = false;
 let sidebarOpen = true;
 
@@ -497,22 +489,6 @@ const CYCLING_TYPES = new Set([
 const MAIN_TYPES = new Set([
     'primary', 'primary_link', 'trunk', 'trunk_link', 'secondary', 'secondary_link'
 ]);
-// Pedestrian zones and footways
-const PEDESTRIAN_TYPES = new Set(['pedestrian', 'footway']);
-// Cycling infrastructure: separate cycleways (highway=cycleway) plus on-road /
-// shared facilities flagged via risk factors (bike lanes, tracks, sharrows…).
-const CYCLE_FACTOR_KEYS = [
-    'Cycle Track', 'Bicycle Road', 'Buffered Lane', 'Bike Lane',
-    'Sharrow', 'Segregated Path', 'Bicycle Designated'
-];
-function isCyclewayFeature(p) {
-    if ((p.highway || '') === 'cycleway') return true;
-    const rf = p.risk_factors;
-    if (rf) {
-        for (const k of CYCLE_FACTOR_KEYS) if (k in rf) return true;
-    }
-    return false;
-}
 
 // Urban street types (excludes trails: track/path/footway/steps/pedestrian)
 const URBAN_STREET_TYPES = new Set([
@@ -580,8 +556,6 @@ function classifyGeography(features) {
 function isVisible(props) {
     if (brasovOnly && !props._inBrasov) return false;
     if (segView === 'urban' && !(URBAN_STREET_TYPES.has(props.highway || '') && props._urban)) return false;
-    if (segView === 'pedestrian' && !PEDESTRIAN_TYPES.has(props.highway || '')) return false;
-    if (segView === 'cycleway' && !isCyclewayFeature(props)) return false;
     return true;
 }
 
